@@ -14,8 +14,9 @@ torch>=2.1
 torchvision>=0.16
 scikit-learn>=1.3
 
-# TensorFlow for STA-Net
-tensorflow>=2.10,<2.11
+# TensorFlow for STA-Net — requires Python <=3.11, install separately
+# See baselines/STA-Net/requirements_stanet.txt
+# tensorflow>=2.10,<2.11
 
 # Utilities
 tqdm>=4.65
