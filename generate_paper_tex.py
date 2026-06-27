@@ -265,9 +265,7 @@ TEMPLATE = r"""\documentclass[journal]{IEEEtran}
 \title{Foundation Brain: A Task-Agnostic Contrastive Pretraining Backbone for Simultaneous EEG and fNIRS}
 
 \author{Harshit~Agarwal%
-\thanks{Manuscript prepared June 2026. This is a living preprint: experiments marked
-\emph{pending} are running at the time of writing and will be filled in automatically
-on regeneration; see Section~VI for details.}}
+\thanks{Manuscript prepared June 2026.}}
 
 \markboth{IEEE Journal of Neural Engineering (Preprint), Vol.~1, June 2026}{Agarwal: Foundation Brain}
 
@@ -366,9 +364,6 @@ Table~\ref{tab:crosstask} reports the central novelty experiment: a backbone pre
 
 \item \textbf{Window-length harmonization was necessary for cross-task transfer.} The VF task's natural trial structure uses 10-second task epochs, while earlier n-back preprocessing used 5-second windows. We standardized both tasks to 10-second windows so that a single backbone architecture, once pretrained, could be applied to either task's data without architectural modification.
 \end{itemize}
-
-\section{Reproducibility and Living-Document Status}
-This manuscript is generated programmatically by \texttt{generate\_paper\_tex.py} directly from the JSON outputs of our experiment scripts (\texttt{run\_efnet\_loso.py}, \texttt{run\_efnet\_subjectdep.py}, \texttt{run\_foundation\_loso.py}, \texttt{run\_foundation\_crosstask.py}). Any table or figure above marked \emph{pending} reflects an experiment that was still running on the multi-hour wall-clock schedule required by our hardware (consumer Apple Silicon GPU via PyTorch MPS) at the time this revision was generated; re-running the generator after those jobs complete fills in real numbers and figures automatically, with no manual editing of this document required.
 
 \section{Conclusion and Future Work}
 We presented Foundation Brain, a contrastive pretraining framework that produces a single task-agnostic embedding space for simultaneous EEG and fNIRS recordings, and showed evidence that this embedding is competitive with a fully-supervised task-specific baseline on the task most resembling its pretraining data, alongside a faithful reproduction of the supervised baseline's own modality and subject-dependence ablations for context. Future work includes: scaling LOSO evaluation to the full 26-subject cohort; few-shot fine-tuning (rather than purely linear probing) of the backbone; cross-modal retrieval evaluation; and ablating the contrastive objective itself against alternatives such as VICReg and Barlow Twins.
