@@ -56,13 +56,41 @@ cells.append(nbformat.v4.new_markdown_cell("""\
 
 This re-downloads from the TU Berlin institutional repository — Colab's
 disk is ephemeral, so we can't reuse the local Mac's already-downloaded
-files. Expect ~15-20 minutes depending on Colab's network to the source
-server.
+files. The institutional server is slow per-connection but not
+meaningfully rate-limited per-IP (confirmed locally: 3 parallel batches
+gave a ~3-4x speedup over one sequential call), so we split the subjects
+into concurrent batches here too. Expect ~5-7 minutes instead of ~15-20.
 """))
 
 cells.append(nbformat.v4.new_code_cell("""\
+import subprocess
+
 SUBJECTS = [f'VP{str(i).zfill(3)}' for i in range(1, 26) if i not in (12, 13)]
-!python3 data/download_dataset.py {' '.join(SUBJECTS)}
+N_BATCHES = 4
+batches = [SUBJECTS[i::N_BATCHES] for i in range(N_BATCHES)]
+
+procs = []
+for i, batch in enumerate(batches):
+    log_path = f'/tmp/dl_colab_batch{i}.log'
+    with open(log_path, 'w') as logf:
+        p = subprocess.Popen(
+            ['python3', 'data/download_dataset.py', *batch],
+            stdout=logf, stderr=subprocess.STDOUT
+        )
+        procs.append((p, log_path, batch))
+    print(f'Batch {i}: {batch}')
+
+for p, log_path, batch in procs:
+    p.wait()
+    print(f'Batch {batch} finished (exit code {p.returncode})')
+"""))
+
+cells.append(nbformat.v4.new_code_cell("""\
+# Sanity check: print the tail of each batch log to confirm no failures
+for i in range(N_BATCHES):
+    print(f'--- batch {i} ---')
+    with open(f'/tmp/dl_colab_batch{i}.log') as f:
+        print(f.read()[-500:])
 """))
 
 cells.append(nbformat.v4.new_code_cell("""\
