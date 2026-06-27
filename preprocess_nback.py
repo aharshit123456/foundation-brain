@@ -24,7 +24,7 @@ OUT_PATH  = Path('data/processed/dataset_nback_windows.pkl')
 SESSION_ROWS   = {0: 5, 1: 6, 2: 7}   # label → row index in y matrix
 CLASS_NAMES    = {0: '0-back', 1: '2-back', 2: '3-back'}
 TASK_DUR_S     = 40     # seconds of task per trial (paper protocol)
-WIN_S, STEP_S  = 5, 1  # window and step in seconds
+WIN_S, STEP_S  = 10, 1  # window and step in seconds — matches VF window length for cross-task transfer
 
 
 def bandpass_eeg(eeg, fs, low=1.0, high=40.0, order=6):

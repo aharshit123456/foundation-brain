@@ -9,6 +9,12 @@ data/processed/
 # PDF papers — use git-lfs or store separately
 *.pdf
 
+# LaTeX build artifacts
+*.aux
+*.out
+*.toc
+*.synctex.gz
+
 # Python
 __pycache__/
 *.py[cod]

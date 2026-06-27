@@ -23,10 +23,12 @@ class EFNet(nn.Module):
     """
     PyTorch reimplementation of EF-Net (Arif et al. 2024, Sensors).
     Adapted from TF original in baselines/EF-Net/EEG-fNIRS/hybrid_model_structures.py.
-    Input shapes adapted to 5s windows: EEG (B,1,30,1000), NIRS (B,1,72,50).
+    eeg_shape/nirs_shape should match the actual window length used by the dataset.
     """
-    def __init__(self, n_classes=2):
+    def __init__(self, n_classes=2, eeg_shape=(30, 1000), nirs_shape=(72, 50), modality='both'):
         super().__init__()
+        assert modality in ('both', 'eeg', 'nirs')
+        self.modality = modality
         self.eeg_branch = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=(1, 7)), nn.ReLU(),
             nn.Conv2d(32, 32, kernel_size=(1, 7)), nn.ReLU(),
@@ -55,8 +57,8 @@ class EFNet(nn.Module):
             nn.Flatten(),
         )
         with torch.no_grad():
-            eeg_out  = self.eeg_branch(torch.zeros(1, 1, 30, 1000))
-            nirs_out = self.nirs_branch(torch.zeros(1, 1, 72, 50))
+            eeg_out  = self.eeg_branch(torch.zeros(1, 1, *eeg_shape))
+            nirs_out = self.nirs_branch(torch.zeros(1, 1, *nirs_shape))
 
         self.eeg_fc = nn.Sequential(
             nn.Linear(eeg_out.shape[1], 256), nn.ReLU(),
@@ -66,16 +68,22 @@ class EFNet(nn.Module):
         self.nirs_fc = nn.Sequential(
             nn.Linear(nirs_out.shape[1], 128), nn.ReLU()
         )
+        classifier_in = {'both': 256, 'eeg': 128, 'nirs': 128}[modality]
         self.classifier = nn.Sequential(
-            nn.Linear(256, 256), nn.ReLU(), nn.Dropout(0.5),
+            nn.Linear(classifier_in, 256), nn.ReLU(), nn.Dropout(0.5),
             nn.Linear(256, 64), nn.ReLU(),
             nn.Linear(64, n_classes)
         )
 
     def forward(self, eeg, nirs):
-        e = self.eeg_fc(self.eeg_branch(eeg))
-        f = self.nirs_fc(self.nirs_branch(nirs))
-        combined = F.normalize(torch.cat([e, f], dim=1), p=2, dim=1)
+        if self.modality == 'eeg':
+            combined = F.normalize(self.eeg_fc(self.eeg_branch(eeg)), p=2, dim=1)
+        elif self.modality == 'nirs':
+            combined = F.normalize(self.nirs_fc(self.nirs_branch(nirs)), p=2, dim=1)
+        else:
+            e = self.eeg_fc(self.eeg_branch(eeg))
+            f = self.nirs_fc(self.nirs_branch(nirs))
+            combined = F.normalize(torch.cat([e, f], dim=1), p=2, dim=1)
         return self.classifier(combined)
 
 
@@ -92,8 +100,13 @@ class EEGNIRSDataset(Dataset):
         return self.eeg[i], self.nirs[i], self.labels[i]
 
 
-def run_loso(all_data, n_epochs=30, batch_size=32, lr=1e-3):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+def run_loso(all_data, n_epochs=30, batch_size=32, lr=1e-3, modality='both'):
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    elif torch.backends.mps.is_available():
+        device = torch.device('mps')
+    else:
+        device = torch.device('cpu')
     log(f"Using device: {device}")
     if device.type == 'cuda':
         log(f"GPU: {torch.cuda.get_device_name(0)}")
@@ -118,7 +131,10 @@ def run_loso(all_data, n_epochs=30, batch_size=32, lr=1e-3):
                                                   all_data[test_subj]['labels']),
                                   batch_size=batch_size, shuffle=False)
 
-        model     = EFNet(n_classes=2).to(device)
+        eeg_shape  = tr_eeg.shape[1:]
+        nirs_shape = tr_nirs.shape[1:]
+        model     = EFNet(n_classes=2, eeg_shape=eeg_shape, nirs_shape=nirs_shape,
+                          modality=modality).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         criterion = nn.CrossEntropyLoss()
 
@@ -156,11 +172,26 @@ def run_loso(all_data, n_epochs=30, batch_size=32, lr=1e-3):
     log(f"\n{'='*50}")
     log(f"LOSO Mean Accuracy : {mean_acc:.3f}")
     log(f"LOSO Mean F1       : {mean_f1:.3f}")
-    log(f"(Paper subject-independent F1 = 0.6505 on full 26 subjects)")
+    log(f"(Paper subject-independent F1 = 0.6505 on full 26 subjects, fNIRS+EEG)")
     return results, mean_acc, mean_f1
 
 
+# Paper's Table 4 (subject-independent, 20 train / 6 test subjects) reference numbers
+PAPER_F1_BY_MODALITY = {'both': 0.6505, 'nirs': 0.6380, 'eeg': 0.5666}
+OUT_FILE_BY_MODALITY  = {
+    'both': 'efnet_results.json',
+    'nirs': 'efnet_results_fnirs.json',
+    'eeg':  'efnet_results_eeg.json',
+}
+
+
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--modality', choices=['both', 'eeg', 'nirs'], default='both')
+    args = parser.parse_args()
+    modality = args.modality
+
     log("Loading data...")
     with open('data/processed/dataset_vf_windows.pkl', 'rb') as f:
         all_data = pickle.load(f)
@@ -168,21 +199,25 @@ if __name__ == '__main__':
     log(f"Subjects: {sorted(all_data.keys())}")
     for s, d in all_data.items():
         log(f"  {s}: eeg={d['eeg'].shape}, nirs={d['nirs'].shape}, labels={d['labels'].shape}")
+    log(f"Modality: {modality}")
 
-    results, mean_acc, mean_f1 = run_loso(all_data, n_epochs=30, batch_size=32, lr=1e-3)
+    results, mean_acc, mean_f1 = run_loso(all_data, n_epochs=30, batch_size=32, lr=1e-3,
+                                          modality=modality)
 
     efnet_results = {
-        'model': 'EF-Net (PyTorch reimplementation)',
+        'model': f'EF-Net (PyTorch reimplementation, modality={modality})',
         'dataset': 'Shin 2017 Dataset C (VF task)',
+        'modality': modality,
         'n_subjects': len(all_data),
         'evaluation': 'LOSO',
         'mean_acc': round(mean_acc, 4),
         'mean_f1':  round(mean_f1, 4),
-        'paper_f1_26subj': 0.6505,
+        'paper_f1_26subj': PAPER_F1_BY_MODALITY[modality],
         'per_subject': {s: {'acc': round(v['acc'], 4), 'f1': round(v['f1'], 4)}
                         for s, v in results.items()}
     }
     os.makedirs('data/processed', exist_ok=True)
-    with open('data/processed/efnet_results.json', 'w') as f:
+    out_path = f'data/processed/{OUT_FILE_BY_MODALITY[modality]}'
+    with open(out_path, 'w') as f:
         json.dump(efnet_results, f, indent=2)
-    log("Saved results to data/processed/efnet_results.json")
+    log(f"Saved results to {out_path}")

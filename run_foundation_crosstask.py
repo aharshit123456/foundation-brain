@@ -57,7 +57,12 @@ def run_crosstask_loso(vf_data, nback_data,
       pretraining task  = VF (binary)
       evaluation task   = n-back (3-class)
     """
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    elif torch.backends.mps.is_available():
+        device = torch.device('mps')
+    else:
+        device = torch.device('cpu')
     log(f"Using device: {device}")
     if device.type == 'cuda':
         log(f"GPU: {torch.cuda.get_device_name(0)}")
@@ -83,7 +88,8 @@ def run_crosstask_loso(vf_data, nback_data,
             batch_size=batch_size, shuffle=True, drop_last=True
         )
 
-        model = FoundationBrain(embed_dim=128).to(device)
+        model = FoundationBrain(embed_dim=128, eeg_shape=tr_eeg.shape[1:],
+                                nirs_shape=tr_nirs.shape[1:]).to(device)
         final_loss = pretrain_one_fold(
             model, vf_train_loader, device,
             n_epochs=n_pretrain_epochs, lr=lr, temperature=temperature
@@ -144,9 +150,16 @@ def run_crosstask_loso(vf_data, nback_data,
 
 
 if __name__ == '__main__':
+    # Preprocess VF if not already done
+    vf_path = 'data/processed/dataset_vf_windows.pkl'
+    if not os.path.exists(vf_path):
+        log("VF windows not found — running preprocessing...")
+        import subprocess, sys
+        subprocess.run([sys.executable, 'preprocess_vf.py'], check=True)
+
     # Load VF windows (pretrain source)
     log("Loading VF windows (pretraining task)...")
-    with open('data/processed/dataset_vf_windows.pkl', 'rb') as f:
+    with open(vf_path, 'rb') as f:
         vf_data = pickle.load(f)
     log(f"  VF subjects: {sorted(vf_data.keys())}")
 

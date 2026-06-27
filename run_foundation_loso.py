@@ -39,19 +39,20 @@ class EEGEncoder(nn.Module):
     Input: (B, 1, 30, 1000)  — 1 channel, 30 electrodes, 1000 timepoints (5s @ 200Hz)
     Output: (B, 128)          — embedding e_eeg
     """
-    def __init__(self, embed_dim=128):
+    def __init__(self, embed_dim=128, input_shape=(30, 1000)):
         super().__init__()
+        n_channels = input_shape[0]
         # Temporal convolution — learns frequency filters
         self.temporal = nn.Conv2d(1, 40, kernel_size=(1, 25), padding=(0, 12))
         # Spatial convolution — learns electrode weighting (depthwise over channels)
-        self.spatial  = nn.Conv2d(40, 40, kernel_size=(30, 1), groups=1)
+        self.spatial  = nn.Conv2d(40, 40, kernel_size=(n_channels, 1), groups=1)
         self.bn        = nn.BatchNorm2d(40)
         self.pool      = nn.AvgPool2d(kernel_size=(1, 75), stride=(1, 15))
         self.drop      = nn.Dropout(0.5)
 
         # Compute flattened size dynamically
         with torch.no_grad():
-            dummy = torch.zeros(1, 1, 30, 1000)
+            dummy = torch.zeros(1, 1, *input_shape)
             out = self._forward_conv(dummy)
             flat = out.shape[1]
 
@@ -82,18 +83,19 @@ class NIRSEncoder(nn.Module):
     Input: (B, 1, 72, 50)  — 1 channel, 72 optodes (HbO+HbR), 50 timepoints (5s @ 10Hz)
     Output: (B, 128)        — embedding e_nirs
     """
-    def __init__(self, embed_dim=128):
+    def __init__(self, embed_dim=128, input_shape=(72, 50)):
         super().__init__()
+        n_channels = input_shape[0]
         # Temporal convolution across time
         self.temporal = nn.Conv2d(1,  32, kernel_size=(1, 5), padding=(0, 2))
         # Spatial convolution across optodes
-        self.spatial  = nn.Conv2d(32, 64, kernel_size=(72, 1))
+        self.spatial  = nn.Conv2d(32, 64, kernel_size=(n_channels, 1))
         self.bn        = nn.BatchNorm2d(64)
         self.pool      = nn.AvgPool2d(kernel_size=(1, 5), stride=(1, 2))
         self.drop      = nn.Dropout(0.5)
 
         with torch.no_grad():
-            dummy = torch.zeros(1, 1, 72, 50)
+            dummy = torch.zeros(1, 1, *input_shape)
             out = self._forward_conv(dummy)
             flat = out.shape[1]
 
@@ -138,10 +140,10 @@ class ProjectionHead(nn.Module):
 
 
 class FoundationBrain(nn.Module):
-    def __init__(self, embed_dim=128):
+    def __init__(self, embed_dim=128, eeg_shape=(30, 1000), nirs_shape=(72, 50)):
         super().__init__()
-        self.eeg_encoder  = EEGEncoder(embed_dim)
-        self.nirs_encoder = NIRSEncoder(embed_dim)
+        self.eeg_encoder  = EEGEncoder(embed_dim, input_shape=eeg_shape)
+        self.nirs_encoder = NIRSEncoder(embed_dim, input_shape=nirs_shape)
         self.eeg_head     = ProjectionHead(embed_dim, 256, 64)
         self.nirs_head    = ProjectionHead(embed_dim, 256, 64)
 
@@ -269,7 +271,7 @@ def linear_probe(train_emb, train_lbl, test_emb, test_lbl):
     X_test  = scaler.transform(test_emb)
 
     clf = LogisticRegression(max_iter=1000, C=1.0, solver='lbfgs',
-                              multi_class='auto', random_state=42)
+                              random_state=42)
     clf.fit(X_train, train_lbl)
     preds = clf.predict(X_test)
     acc = accuracy_score(test_lbl, preds)
@@ -279,7 +281,12 @@ def linear_probe(train_emb, train_lbl, test_emb, test_lbl):
 
 def run_loso(all_data, n_pretrain_epochs=50, batch_size=64,
              lr=3e-4, temperature=0.07):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    elif torch.backends.mps.is_available():
+        device = torch.device('mps')
+    else:
+        device = torch.device('cpu')
     log(f"Using device: {device}")
     if device.type == 'cuda':
         log(f"GPU: {torch.cuda.get_device_name(0)}")
@@ -311,7 +318,8 @@ def run_loso(all_data, n_pretrain_epochs=50, batch_size=64,
         )
 
         # ── Pretrain backbone with NT-Xent ──
-        model = FoundationBrain(embed_dim=128).to(device)
+        model = FoundationBrain(embed_dim=128, eeg_shape=tr_eeg.shape[1:],
+                                nirs_shape=tr_nirs.shape[1:]).to(device)
         final_loss = pretrain_one_fold(
             model, train_loader, device,
             n_epochs=n_pretrain_epochs, lr=lr, temperature=temperature
@@ -354,8 +362,15 @@ def run_loso(all_data, n_pretrain_epochs=50, batch_size=64,
 # ─────────────────────────────────────────────
 
 if __name__ == '__main__':
+    # Preprocess VF if not already done
+    vf_path = 'data/processed/dataset_vf_windows.pkl'
+    if not os.path.exists(vf_path):
+        log("VF windows not found — running preprocessing...")
+        import subprocess, sys
+        subprocess.run([sys.executable, 'preprocess_vf.py'], check=True)
+
     log("Loading preprocessed windows...")
-    with open('data/processed/dataset_vf_windows.pkl', 'rb') as f:
+    with open(vf_path, 'rb') as f:
         all_data = pickle.load(f)
 
     log(f"Subjects: {sorted(all_data.keys())}")
