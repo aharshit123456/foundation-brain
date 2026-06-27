@@ -56,12 +56,20 @@ def run_subject_dependent(all_data, n_epochs=30, batch_size=32, lr=1e-3,
                 idx, test_size=test_size, random_state=seed, stratify=labels
             )
 
+            # Z-score normalize using train-split statistics only -- see run_efnet_loso.py
+            # for the diagnosis (NIRS is ~1e-3 scale vs EEG's ~1e1 scale; without this the
+            # NIRS branch's conv weights never leave random init and collapse to chance).
+            eeg_mean, eeg_std = eeg[train_idx].mean(), eeg[train_idx].std()
+            nirs_mean, nirs_std = nirs[train_idx].mean(), nirs[train_idx].std()
+            eeg_norm  = (eeg  - eeg_mean)  / (eeg_std  + 1e-8)
+            nirs_norm = (nirs - nirs_mean) / (nirs_std + 1e-8)
+
             train_loader = DataLoader(
-                EEGNIRSDataset(eeg[train_idx], nirs[train_idx], labels[train_idx]),
+                EEGNIRSDataset(eeg_norm[train_idx], nirs_norm[train_idx], labels[train_idx]),
                 batch_size=batch_size, shuffle=True
             )
             test_loader = DataLoader(
-                EEGNIRSDataset(eeg[test_idx], nirs[test_idx], labels[test_idx]),
+                EEGNIRSDataset(eeg_norm[test_idx], nirs_norm[test_idx], labels[test_idx]),
                 batch_size=batch_size, shuffle=False
             )
 

@@ -124,11 +124,26 @@ def run_loso(all_data, n_epochs=30, batch_size=32, lr=1e-3, modality='both'):
         tr_nirs = np.concatenate([all_data[s]['nirs']   for s in subjects if s != test_subj])
         tr_lbl  = np.concatenate([all_data[s]['labels'] for s in subjects if s != test_subj])
 
+        te_eeg  = all_data[test_subj]['eeg']
+        te_nirs = all_data[test_subj]['nirs']
+        te_lbl  = all_data[test_subj]['labels']
+
+        # Z-score normalize each modality using train-set statistics only (no test leakage).
+        # NIRS values are ~1e-3 scale vs EEG's ~1e1 scale -- without this, the NIRS branch's
+        # conv weights (initialized for ~unit-variance input) see near-zero gradients and
+        # never leave random init, collapsing to a single-class prediction regardless of
+        # epochs trained. See run_efnet_loso.py git history / project notes for the
+        # diagnosis: loss frozen at ln(2)=0.693 and chance-level accuracy on every fold.
+        eeg_mean, eeg_std = tr_eeg.mean(), tr_eeg.std()
+        nirs_mean, nirs_std = tr_nirs.mean(), tr_nirs.std()
+        tr_eeg  = (tr_eeg  - eeg_mean)  / (eeg_std  + 1e-8)
+        tr_nirs = (tr_nirs - nirs_mean) / (nirs_std + 1e-8)
+        te_eeg  = (te_eeg  - eeg_mean)  / (eeg_std  + 1e-8)
+        te_nirs = (te_nirs - nirs_mean) / (nirs_std + 1e-8)
+
         train_loader = DataLoader(EEGNIRSDataset(tr_eeg, tr_nirs, tr_lbl),
                                   batch_size=batch_size, shuffle=True)
-        test_loader  = DataLoader(EEGNIRSDataset(all_data[test_subj]['eeg'],
-                                                  all_data[test_subj]['nirs'],
-                                                  all_data[test_subj]['labels']),
+        test_loader  = DataLoader(EEGNIRSDataset(te_eeg, te_nirs, te_lbl),
                                   batch_size=batch_size, shuffle=False)
 
         eeg_shape  = tr_eeg.shape[1:]
