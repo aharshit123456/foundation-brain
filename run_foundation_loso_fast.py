@@ -347,6 +347,16 @@ def run_loso(all_data, n_pretrain_epochs=50, batch_size=64,
         te_nirs = all_data[test_subj]['nirs']
         te_lbl  = all_data[test_subj]['labels']
 
+        # Z-score normalize using train-fold statistics only (no test leakage) -- see
+        # run_efnet_loso.py for the original diagnosis (NIRS ~1e-3 scale vs EEG ~1e1 scale
+        # causes near-zero gradients through an unnormalized NIRS branch).
+        eeg_mean, eeg_std = tr_eeg.mean(), tr_eeg.std()
+        nirs_mean, nirs_std = tr_nirs.mean(), tr_nirs.std()
+        tr_eeg  = (tr_eeg  - eeg_mean)  / (eeg_std  + 1e-8)
+        tr_nirs = (tr_nirs - nirs_mean) / (nirs_std + 1e-8)
+        te_eeg  = (te_eeg  - eeg_mean)  / (eeg_std  + 1e-8)
+        te_nirs = (te_nirs - nirs_mean) / (nirs_std + 1e-8)
+
         train_loader = DeviceResidentBatcher(
             tr_eeg, tr_nirs, tr_lbl,
             batch_size=batch_size, shuffle=True, drop_last=True, device=device

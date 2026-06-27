@@ -308,6 +308,17 @@ def run_loso(all_data, n_pretrain_epochs=50, batch_size=64,
         te_nirs = all_data[test_subj]['nirs']
         te_lbl  = all_data[test_subj]['labels']
 
+        # Z-score normalize using train-fold statistics only (no test leakage). NIRS is
+        # ~1e-3 scale vs EEG's ~1e1 scale -- without this, the NIRS encoder's conv weights
+        # (init'd for ~unit-variance input) see near-zero gradients. See run_efnet_loso.py
+        # for the original diagnosis of this exact failure mode in the EF-Net baseline.
+        eeg_mean, eeg_std = tr_eeg.mean(), tr_eeg.std()
+        nirs_mean, nirs_std = tr_nirs.mean(), tr_nirs.std()
+        tr_eeg  = (tr_eeg  - eeg_mean)  / (eeg_std  + 1e-8)
+        tr_nirs = (tr_nirs - nirs_mean) / (nirs_std + 1e-8)
+        te_eeg  = (te_eeg  - eeg_mean)  / (eeg_std  + 1e-8)
+        te_nirs = (te_nirs - nirs_mean) / (nirs_std + 1e-8)
+
         train_loader = DataLoader(
             EEGNIRSDataset(tr_eeg, tr_nirs, tr_lbl),
             batch_size=batch_size, shuffle=True, drop_last=True

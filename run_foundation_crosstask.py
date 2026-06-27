@@ -83,6 +83,14 @@ def run_crosstask_loso(vf_data, nback_data,
         tr_nirs = np.concatenate([vf_data[s]['nirs']   for s in train_subjs])
         tr_lbl  = np.concatenate([vf_data[s]['labels'] for s in train_subjs])
 
+        # Z-score normalize using VF train-fold statistics -- see run_efnet_loso.py for
+        # the original diagnosis (NIRS ~1e-3 scale vs EEG ~1e1 scale causes near-zero
+        # gradients through an unnormalized NIRS branch).
+        vf_eeg_mean, vf_eeg_std = tr_eeg.mean(), tr_eeg.std()
+        vf_nirs_mean, vf_nirs_std = tr_nirs.mean(), tr_nirs.std()
+        tr_eeg  = (tr_eeg  - vf_eeg_mean)  / (vf_eeg_std  + 1e-8)
+        tr_nirs = (tr_nirs - vf_nirs_mean) / (vf_nirs_std + 1e-8)
+
         vf_train_loader = DataLoader(
             EEGNIRSDataset(tr_eeg, tr_nirs, tr_lbl),
             batch_size=batch_size, shuffle=True, drop_last=True
@@ -105,6 +113,16 @@ def run_crosstask_loso(vf_data, nback_data,
         nb_te_eeg  = nback_data[test_subj]['eeg']
         nb_te_nirs = nback_data[test_subj]['nirs']
         nb_te_lbl  = nback_data[test_subj]['labels']
+
+        # Normalize n-back data with its own train-fold statistics (not VF's) -- the
+        # encoder just needs internally-consistent scale at inference time, and n-back's
+        # raw EEG/NIRS amplitude range need not exactly match VF's.
+        nb_eeg_mean, nb_eeg_std = nb_tr_eeg.mean(), nb_tr_eeg.std()
+        nb_nirs_mean, nb_nirs_std = nb_tr_nirs.mean(), nb_tr_nirs.std()
+        nb_tr_eeg  = (nb_tr_eeg  - nb_eeg_mean)  / (nb_eeg_std  + 1e-8)
+        nb_tr_nirs = (nb_tr_nirs - nb_nirs_mean) / (nb_nirs_std + 1e-8)
+        nb_te_eeg  = (nb_te_eeg  - nb_eeg_mean)  / (nb_eeg_std  + 1e-8)
+        nb_te_nirs = (nb_te_nirs - nb_nirs_mean) / (nb_nirs_std + 1e-8)
 
         nb_train_loader = DataLoader(
             EEGNIRSDataset(nb_tr_eeg, nb_tr_nirs, nb_tr_lbl),
