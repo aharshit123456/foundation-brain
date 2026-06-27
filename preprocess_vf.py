@@ -15,7 +15,7 @@ from pathlib import Path
 
 DATA_ROOT = Path('data/raw')
 OUT_PATH  = Path('data/processed/dataset_vf_windows.pkl')
-SUBJECTS  = [f'VP{str(i).zfill(3)}' for i in range(1, 12)]
+SUBJECTS  = [f'VP{str(i).zfill(3)}' for i in range(1, 26) if i not in (12, 13)]
 
 
 def load_subject(subj, task='vf', data_root=DATA_ROOT):

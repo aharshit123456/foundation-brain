@@ -57,7 +57,20 @@ EEG_FILES = {
     "VP009": "/bitstreams/cbfb7549-c845-43d6-9a9a-056a1ae77ccb/download",
     "VP010": "/bitstreams/e3149970-06a5-4988-8734-fa07f6c22f5c/download",
     "VP011": "/bitstreams/3aea4ad7-6285-4f3d-9475-75adcb8d6695/download",
-    # VP012 may exist for EEG only — add if needed
+    # VP012/VP013 EEG exist on the server but are excluded since they have no NIRS counterpart
+    "VP014": "/bitstreams/b32f32a6-eb99-43e0-8f50-c1bd387a9c94/download",
+    "VP015": "/bitstreams/a1d8ff9c-a7f7-4a97-b4e6-ef96e27e83e3/download",
+    "VP016": "/bitstreams/88e9de88-5b6e-4c93-8788-707826f86cf0/download",
+    "VP017": "/bitstreams/74060e0e-013b-4444-b36f-d66392a30ad8/download",
+    "VP018": "/bitstreams/5f65bb8f-3fd1-4ea5-886d-4bf034e39df3/download",
+    "VP019": "/bitstreams/e40c262b-38e0-41a3-8a3e-3cdc57c09344/download",
+    "VP020": "/bitstreams/8d95f44c-f42b-462f-b306-0c4dccc37814/download",
+    "VP021": "/bitstreams/7145bcdc-52c8-49fb-82aa-d1a10bf47f68/download",
+    "VP022": "/bitstreams/7bf7b313-02b3-4030-98f5-29179810e6c6/download",
+    "VP023": "/bitstreams/f36cc31e-40d5-4e98-9795-22d83b29f8ca/download",
+    "VP024": "/bitstreams/161864e8-8dcb-4852-99d4-37a91b853e90/download",
+    "VP025": "/bitstreams/c18e90ce-0942-463f-a8f0-e2d679c1dd14/download",
+    # VP026 EEG bitstream not found in current repository listing — NIRS only
 }
 
 RAW_DIR = Path(__file__).parent / "raw"
