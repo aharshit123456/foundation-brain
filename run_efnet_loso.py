@@ -141,10 +141,82 @@ def run_loso(all_data, n_epochs=30, batch_size=32, lr=1e-3, modality='both'):
         te_eeg  = (te_eeg  - eeg_mean)  / (eeg_std  + 1e-8)
         te_nirs = (te_nirs - nirs_mean) / (nirs_std + 1e-8)
 
-        train_loader = DataLoader(EEGNIRSDataset(tr_eeg, tr_nirs, tr_lbl),
-                                  batch_size=batch_size, shuffle=True)
-        test_loader  = DataLoader(EEGNIRSDataset(te_eeg, te_nirs, te_lbl),
-                                  batch_size=batch_size, shuffle=False)
+class DeviceResidentBatcher:
+    """
+    Replaces DataLoader for small, fully-in-memory datasets.
+    """
+    def __init__(self, eeg, nirs, labels=None, batch_size=64, shuffle=True,
+                drop_last=False, device='cpu'):
+        self.eeg    = torch.FloatTensor(eeg).unsqueeze(1).to(device)
+        self.nirs   = torch.FloatTensor(nirs).unsqueeze(1).to(device)
+        self.labels = torch.LongTensor(labels).to(device) if labels is not None else None
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.drop_last = drop_last
+        self.n = self.eeg.shape[0]
+
+    def __len__(self):
+        if self.drop_last:
+            return self.n // self.batch_size
+        return (self.n + self.batch_size - 1) // self.batch_size
+
+    def __iter__(self):
+        idx = torch.randperm(self.n, device=self.eeg.device) if self.shuffle \
+            else torch.arange(self.n, device=self.eeg.device)
+        n_batches = len(self)
+        for b in range(n_batches):
+            sl = idx[b * self.batch_size : (b + 1) * self.batch_size]
+            if self.labels is not None:
+                yield self.eeg[sl], self.nirs[sl], self.labels[sl]
+            else:
+                yield self.eeg[sl], self.nirs[sl]
+
+
+def run_loso(all_data, n_epochs=30, batch_size=32, lr=1e-3, modality='both'):
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    elif torch.backends.mps.is_available():
+        device = torch.device('mps')
+    else:
+        device = torch.device('cpu')
+    log(f"Using device: {device}")
+    if device.type == 'cuda':
+        log(f"GPU: {torch.cuda.get_device_name(0)}")
+
+    subjects = sorted(all_data.keys())
+    results  = {}
+
+    # Outer progress bar — one tick per LOSO fold
+    fold_bar = tqdm(subjects, desc='LOSO folds', unit='fold', file=sys.stdout)
+
+    for test_subj in fold_bar:
+        fold_bar.set_postfix(test=test_subj)
+
+        tr_eeg  = np.concatenate([all_data[s]['eeg']    for s in subjects if s != test_subj])
+        tr_nirs = np.concatenate([all_data[s]['nirs']   for s in subjects if s != test_subj])
+        tr_lbl  = np.concatenate([all_data[s]['labels'] for s in subjects if s != test_subj])
+
+        te_eeg  = all_data[test_subj]['eeg']
+        te_nirs = all_data[test_subj]['nirs']
+        te_lbl  = all_data[test_subj]['labels']
+
+        # Z-score normalize each modality using train-set statistics only (no test leakage).
+        # NIRS values are ~1e-3 scale vs EEG's ~1e1 scale -- without this, the NIRS branch's
+        # conv weights (initialized for ~unit-variance input) see near-zero gradients and
+        # never leave random init, collapsing to a single-class prediction regardless of
+        # epochs trained. See run_efnet_loso.py git history / project notes for the
+        # diagnosis: loss frozen at ln(2)=0.693 and chance-level accuracy on every fold.
+        eeg_mean, eeg_std = tr_eeg.mean(), tr_eeg.std()
+        nirs_mean, nirs_std = tr_nirs.mean(), tr_nirs.std()
+        tr_eeg  = (tr_eeg  - eeg_mean)  / (eeg_std  + 1e-8)
+        tr_nirs = (tr_nirs - nirs_mean) / (nirs_std + 1e-8)
+        te_eeg  = (te_eeg  - eeg_mean)  / (eeg_std  + 1e-8)
+        te_nirs = (te_nirs - nirs_mean) / (nirs_std + 1e-8)
+
+        train_loader = DeviceResidentBatcher(tr_eeg, tr_nirs, tr_lbl,
+                                             batch_size=batch_size, shuffle=True, device=device)
+        test_loader  = DeviceResidentBatcher(te_eeg, te_nirs, te_lbl,
+                                             batch_size=batch_size, shuffle=False, device=device)
 
         eeg_shape  = tr_eeg.shape[1:]
         nirs_shape = tr_nirs.shape[1:]
@@ -160,7 +232,6 @@ def run_loso(all_data, n_epochs=30, batch_size=32, lr=1e-3, modality='both'):
             model.train()
             epoch_loss = 0.0
             for eeg_b, nirs_b, lbl_b in train_loader:
-                eeg_b, nirs_b, lbl_b = eeg_b.to(device), nirs_b.to(device), lbl_b.to(device)
                 optimizer.zero_grad()
                 loss = criterion(model(eeg_b, nirs_b), lbl_b)
                 loss.backward()
@@ -173,9 +244,8 @@ def run_loso(all_data, n_epochs=30, batch_size=32, lr=1e-3, modality='both'):
         preds, trues = [], []
         with torch.no_grad():
             for eeg_b, nirs_b, lbl_b in test_loader:
-                eeg_b, nirs_b = eeg_b.to(device), nirs_b.to(device)
                 preds.extend(model(eeg_b, nirs_b).argmax(dim=1).cpu().numpy())
-                trues.extend(lbl_b.numpy())
+                trues.extend(lbl_b.cpu().numpy())
 
         acc = accuracy_score(trues, preds)
         f1  = f1_score(trues, preds, average='weighted')

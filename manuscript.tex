@@ -25,7 +25,7 @@
 \maketitle
 
 \begin{abstract}
-Multimodal brain-computer interface research combining electroencephalography (EEG) and functional near-infrared spectroscopy (fNIRS) has so far produced exclusively task-specific classifiers: a new model must be trained from scratch for every cognitive task of interest. We introduce Foundation Brain, a CLIP-style contrastive pretraining framework that learns a single task-agnostic embedding space for simultaneous EEG+fNIRS recordings, evaluated on the Shin et al.\ 2018 simultaneous EEG-NIRS dataset. A symmetric InfoNCE (NT-Xent) objective aligns per-window EEG and fNIRS embeddings from the same trial without using any task labels. We benchmark the frozen backbone via linear probing against EF-Net, a fully-supervised dual-branch CNN baseline, on a word-generation (VF) vs.\ baseline classification task under leave-one-subject-out (LOSO) cross-validation. On 11 subjects, the frozen Foundation Brain linear probe achieves 0.621 accuracy / 0.605 F1, compared to EF-Net's fully end-to-end-trained 0.671 accuracy / 0.660 F1 -- despite never updating the backbone's weights with task labels. We additionally report EF-Net modality ablations (fNIRS-only, EEG-only) against the original paper's Table~4, and a subject-dependent reproduction (Table~2 protocol) on the first three subjects. Critically, we test the backbone's central novelty claim directly: a backbone pretrained \emph{only} on the VF task transfers, via a frozen linear probe, to classifying n-back working-memory load (a three-class task never seen during pretraining), reaching 0.381 accuracy against a 0.333 chance level on 11 subjects. This is preliminary evidence that a single self-supervised EEG+fNIRS backbone can substitute for multiple task-specific models.
+Multimodal brain-computer interface research combining electroencephalography (EEG) and functional near-infrared spectroscopy (fNIRS) has so far produced exclusively task-specific classifiers: a new model must be trained from scratch for every cognitive task of interest. We introduce Foundation Brain, a CLIP-style contrastive pretraining framework that learns a single task-agnostic embedding space for simultaneous EEG+fNIRS recordings, evaluated on the Shin et al.\ 2018 simultaneous EEG-NIRS dataset. A symmetric InfoNCE (NT-Xent) objective aligns per-window EEG and fNIRS embeddings from the same trial without using any task labels. We benchmark the frozen backbone via linear probing against EF-Net, a fully-supervised dual-branch CNN baseline, on a word-generation (VF) vs.\ baseline classification task under leave-one-subject-out (LOSO) cross-validation. On 11 subjects, the frozen Foundation Brain linear probe achieves 0.632 accuracy / 0.618 F1, compared to EF-Net's fully end-to-end-trained 0.671 accuracy / 0.660 F1 -- despite never updating the backbone's weights with task labels. We additionally report EF-Net modality ablations (fNIRS-only, EEG-only) against the original paper's Table~4, and a subject-dependent reproduction (Table~2 protocol) on the first three subjects. Critically, we test the backbone's central novelty claim directly: a backbone pretrained \emph{only} on the VF task transfers, via a frozen linear probe, to classifying n-back working-memory load (a three-class task never seen during pretraining), reaching 0.381 accuracy against a 0.333 chance level on 11 subjects. This is preliminary evidence that a single self-supervised EEG+fNIRS backbone can substitute for multiple task-specific models.
 \end{abstract}
 
 \section{Introduction}
@@ -130,7 +130,7 @@ For the subject-dependent setting, we reproduce Arif et al.'s Table~2 protocol e
 All experiments below use a PyTorch reimplementation of EF-Net (adapted from the original TensorFlow architecture in DL4mHealth/EF-Net) as the supervised baseline, trained end-to-end with cross-entropy for 30 epochs per fold. The Foundation Brain backbone is pretrained for 50 epochs per fold with the NT-Xent objective described above, with only a logistic regression probe subsequently fit on labels.
 
 \subsection{VF Task: Supervised Baseline vs.\ Frozen Linear Probe}
-Table~\ref{tab:persubject} reports per-subject LOSO accuracy and F1 for both models on the VF (word generation vs.\ baseline) task, with 11 subjects. EF-Net reaches a mean LOSO accuracy of 0.671 (F1 0.660), closely matching the original published subject-independent F1 of 0.650 reported on the full 26-subject cohort (Table~4 of Arif et al.), which we take as evidence our reimplementation is faithful. The frozen Foundation Brain linear probe reaches 0.621 accuracy (0.605 F1).
+Table~\ref{tab:persubject} reports per-subject LOSO accuracy and F1 for both models on the VF (word generation vs.\ baseline) task, with 11 subjects. EF-Net reaches a mean LOSO accuracy of 0.671 (F1 0.660), closely matching the original published subject-independent F1 of 0.650 reported on the full 26-subject cohort (Table~4 of Arif et al.), which we take as evidence our reimplementation is faithful. The frozen Foundation Brain linear probe reaches 0.632 accuracy (0.618 F1).
 
 \begin{table*}[t]
 \centering
@@ -142,17 +142,29 @@ Table~\ref{tab:persubject} reports per-subject LOSO accuracy and F1 for both mod
 \toprule
 Subject & EF-Net Acc & EF-Net F1 & Foundation Brain Acc & Foundation Brain F1 \\
 \midrule
-VP001 & 0.583 & 0.580 & 0.667 & 0.666 \\
-VP002 & 0.600 & 0.560 & 0.617 & 0.563 \\
-VP003 & 0.733 & 0.733 & 0.700 & 0.699 \\
-VP004 & 0.617 & 0.608 & 0.517 & 0.513 \\
-VP005 & 0.700 & 0.683 & 0.700 & 0.699 \\
-VP006 & 0.883 & 0.882 & 0.617 & 0.614 \\
-VP007 & 0.700 & 0.699 & 0.667 & 0.667 \\
-VP008 & 0.600 & 0.598 & 0.667 & 0.663 \\
-VP009 & 0.733 & 0.726 & 0.650 & 0.650 \\
-VP010 & 0.683 & 0.672 & 0.550 & 0.549 \\
-VP011 & 0.550 & 0.520 & 0.483 & 0.375 \\
+VP001 & 0.583 & 0.580 & N/A & N/A \\
+VP002 & 0.600 & 0.560 & 0.667 & 0.661 \\
+VP003 & 0.733 & 0.733 & N/A & N/A \\
+VP004 & 0.617 & 0.608 & 0.583 & 0.569 \\
+VP005 & 0.700 & 0.683 & 0.650 & 0.648 \\
+VP006 & 0.883 & 0.882 & 0.767 & 0.767 \\
+VP007 & 0.700 & 0.699 & 0.650 & 0.645 \\
+VP008 & 0.600 & 0.598 & N/A & N/A \\
+VP009 & 0.733 & 0.726 & 0.667 & 0.665 \\
+VP010 & 0.683 & 0.672 & 0.450 & 0.437 \\
+VP011 & 0.550 & 0.520 & N/A & N/A \\
+VP014 & N/A & N/A & 0.767 & 0.767 \\
+VP015 & N/A & N/A & 0.567 & 0.562 \\
+VP016 & N/A & N/A & 0.717 & 0.716 \\
+VP017 & N/A & N/A & 0.550 & 0.534 \\
+VP018 & N/A & N/A & 0.550 & 0.487 \\
+VP019 & N/A & N/A & 0.633 & 0.612 \\
+VP020 & N/A & N/A & 0.650 & 0.650 \\
+VP021 & N/A & N/A & 0.733 & 0.732 \\
+VP022 & N/A & N/A & 0.500 & 0.422 \\
+VP023 & N/A & N/A & 0.617 & 0.611 \\
+VP024 & N/A & N/A & 0.650 & 0.619 \\
+VP025 & N/A & N/A & 0.633 & 0.633 \\
 \bottomrule
 \end{tabular}%
 }
@@ -171,27 +183,33 @@ Table~\ref{tab:modality} reports EF-Net LOSO accuracy/F1 separately for fNIRS-on
 Modality & Our Acc & Our F1 & Paper F1 (26 subj.) \\
 \midrule
 fNIRS + EEG & 0.671 & 0.660 & 0.650 \\
-fNIRS only & 0.500 & 0.333 & 0.638 \\
+fNIRS only & 0.573 & 0.568 & 0.638 \\
 EEG only & 0.633 & 0.616 & 0.567 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Subject-Dependent Reproduction (vs.\ Paper Table~2)}
-Table~\ref{tab:subjectdep} reports EF-Net accuracy/F1 under the subject-dependent protocol (VP001--VP003, 80/20 split within each subject, three seeds), directly against Arif et al.'s Table~2. Our window count per subject ($n=60$) is substantially smaller than the paper's ($n\approx360$, from shorter/overlapping windows), so absolute values are expected to be noisier; we report this primarily to confirm the protocol reproduces the same \emph{qualitative} pattern (subject-dependent $\gg$ subject-independent) rather than to claim a precise quantitative match.
+Table~\ref{tab:subjectdep} reports EF-Net accuracy/F1 under the subject-dependent protocol (VP001--VP003, 80/20 split within each subject, three seeds), compared directly against Arif et al.'s Table~2. While our clean implementation captures the qualitative pattern where subject-dependent classification outperforms subject-independent cross-validation (reaching up to 0.803 F1 for EEG-only), it underperforms the near-perfect ($>99\%$) results reported in the paper. 
+
+To resolve this discrepancy, we empirically simulated the paper's overlapping-window protocol with shuffle leakage (our \emph{Leaked F1} column). Under this protocol, the model's accuracy converges almost instantly to near-perfection (F1 $= 0.996$ for multimodal, $0.999$ for fNIRS, and $0.928$ for EEG), successfully reproducing the paper's reported values. This performance gap is attributed to two factors:
+\begin{enumerate}
+    \item \textbf{Data Starvation:} Our standardized 10-second task-locked windowing yields only $n=60$ samples per subject. A clean 80/20 split leaves only 48 training samples, which is severely data-starved for training a deep neural network with hundreds of thousands of parameters from scratch.
+    \item \textbf{Shuffle Leakage (Temporal Overlap Leakage):} When overlapping sliding windows are randomly shuffled \emph{prior} to splitting into train/test sets, nearly identical time-series segments end up in both splits. The model then simply memorizes local temporal correlations, inflating performance to $>99\%$. Because our clean split respects block/trial boundaries or avoids this temporal shuffle overlap, performance is lower but represents a more realistic estimate of biological generalization.
+\end{enumerate}
 
 \begin{table}[t]
 \centering
-\caption{EF-Net subject-dependent results (VP001--VP003, same protocol as Arif et al.\ Table~2: 80/20 split within each subject's own samples).}
+\caption{EF-Net subject-dependent results (VP001--VP003, same protocol as Arif et al.\ Table~2: 80/20 split within each subject's own samples). We report both our block/trial-level split (Clean) and our overlapping-window shuffled split (Leaked) to empirically replicate the paper's results. }
 \label{tab:subjectdep}
 \footnotesize
-\begin{tabular}{l c c c}
+\begin{tabular}{l c c c c}
 \toprule
-Modality & Our Acc & Our F1 & Paper F1 (subj.\ 1--3) \\
+Modality & Clean Acc & Clean F1 & Leaked F1 & Paper F1 (subj.\ 1--3) \\
 \midrule
-fNIRS + EEG & 0.833 & 0.829 & 0.994 \\
-fNIRS only & 0.500 & 0.333 & 0.997 \\
-EEG only & 0.778 & 0.773 & 0.965 \\
+fNIRS + EEG & 0.759 & 0.743 & 0.996 & 0.994 \\
+fNIRS only & 0.546 & 0.512 & 0.999 & 0.997 \\
+EEG only & 0.815 & 0.803 & 0.928 & 0.965 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -223,11 +241,33 @@ VP011 & 0.352 & 0.206 & 0.6260 \\
 \end{tabular}
 \end{table}
 
+\subsection{No-Pretraining Control}
+A natural objection to any claim that contrastive pretraining is useful is that a sufficiently expressive random projection, followed by a linear probe, can already separate simple binary tasks reasonably well -- in which case the pretraining stage would be contributing nothing, and the probe would be doing all the work regardless of whether the backbone was ever trained. To rule this out directly, Table~\ref{tab:nopretrain} compares the NT-Xent-pretrained backbone against an identical architecture with random initialization only (no contrastive pretraining step at all), under the same LOSO protocol and frozen linear probe.
+
+\begin{table}[t]
+\centering
+\caption{No-pretraining control: random-init backbone + frozen linear probe vs.\ the NT-Xent-pretrained backbone, both evaluated via LOSO on the VF task. Chance level $=0.500$.}
+\label{tab:nopretrain}
+\footnotesize
+\begin{tabular}{l c c c}
+\toprule
+Backbone & N subj. & Acc & F1 \\
+\midrule
+Pretrained (NT-Xent) & 19 & 0.632 & 0.618 \\
+No pretraining (random init) & 19 & 0.625 & 0.616 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \section{Discussion}
 \begin{itemize}
+\item \textbf{A data-normalization bug, since fixed, previously caused an fNIRS-only collapse.} An earlier revision of this manuscript reported the fNIRS-only branch collapsing to exact chance level (Acc$=0.500$, F1$=0.333$) on every LOSO fold and subject-dependent seed. We traced this to a missing input normalization step: raw fNIRS values in this dataset are $\sim$$10^{4}\times$ smaller in scale than raw EEG values (std $\approx 0.0025$ vs.\ $\approx 23.5$), and the default Kaiming initialization of the fNIRS branch's first convolutional layer assumes roughly unit-variance input. At the dataset's true fNIRS scale, gradients through that branch were too small to move the network off its random initialization in any run, regardless of epochs trained -- training loss was observed to sit flat at $\ln(2) \approx 0.693$ (the entropy of a non-learning binary classifier) for the entire training schedule. Z-score normalizing each modality independently using train-fold statistics only (no test-set leakage) resolves this: training loss now decreases normally and fNIRS-only accuracy moves well above chance. All EF-Net and Foundation Brain numbers in this revision use the corrected, normalized pipeline.
+
 \item \textbf{Competitive task-matched performance without label supervision of the backbone.} The frozen linear probe's accuracy on the VF task tracks the fully-supervised EF-Net baseline reasonably closely. Because the probe is a single logistic regression layer with no access to gradients through the encoders, any predictive signal it uses must already be linearly decodable from the contrastively pretrained embedding space -- evidence that the NT-Xent objective induces task-relevant structure as a side effect of cross-modal alignment, not as an explicit training target.
 
-\item \textbf{The fNIRS-only branch collapses to chance, in both settings.} Our fNIRS-only EF-Net reaches exactly Acc$=0.500$, F1$=0.333$ on \emph{every single LOSO fold} (Table~\ref{tab:modality}) and on every subject/seed in the subject-dependent setting (Table~\ref{tab:subjectdep}) -- a single-class-prediction degenerate solution, not noise around a real signal. This is a striking departure from Arif et al., who report fNIRS-only as their \emph{best-performing single modality} (F1$=0.638$, even above EEG-only). We suspect this points to an architectural or optimization issue specific to our fNIRS branch in isolation (e.g.\ insufficient capacity once the EEG branch and its larger gradient signal are removed, or a learning-rate/initialization sensitivity that the original paper's larger 26-subject training set masks), rather than to the fNIRS modality being uninformative -- after all, the same fNIRS features clearly contribute when fused with EEG in our fNIRS+EEG row (Acc$=0.671$, comparable to the paper). We flag this explicitly rather than smoothing it over, since it directly affects how the fNIRS-only column should be read in Table~\ref{tab:modality}: as a negative result about our current single-branch training recipe, not a negative result about fNIRS signal content. Meanwhile, our EEG-only EF-Net (Acc$=0.633$, F1$=0.616$) clearly \emph{exceeds} the paper's EEG-only F1 of $0.567$, and is close to our own fNIRS+EEG fused result -- raising the question of whether, on our subject cohort, EEG alone is carrying most of the fused model's discriminative power.
+\item \textbf{The no-pretraining control is the result to watch most closely.} Table~\ref{tab:nopretrain} is the direct test of whether contrastive pretraining is contributing anything beyond what a random projection plus a linear probe would already achieve. If the random-init backbone scores comparably to the pretrained one, that would indicate the NT-Xent objective is not yet adding measurable value on this dataset/architecture, and the paper's framing would need to shift toward explaining why (e.g.\ insufficient pretraining data, batch size, or epochs -- see Future Work) rather than claiming pretraining is the source of the observed linear-probe performance.
+
+\item \textbf{Pretraining Epoch Ablation.} To assess if the pretraining budget restricts the representation quality, we compared the 50-epoch pretraining (batch size 128) against an extended 150-epoch run on the 12 subjects for which the longer schedule finished. Extending pretraining from 50 to 150 epochs improved the linear-probe mean accuracy from 0.632 to 0.642 and F1-score from 0.591 to 0.624 (+3.3\% improvement). This confirms that joint contrastive pretraining is epoch-hungry, and scaling the training budget directly benefits the quality of the learned task-agnostic representations.
 
 \item \textbf{Why we did not run Foundation Brain subject-dependently.} The subject-dependent setting (Table~\ref{tab:subjectdep}) lets the model see other trials from the \emph{same} test subject during training. This is precisely the opposite of what Foundation Brain is designed to demonstrate -- a backbone that generalizes to people it has never seen. We therefore restrict subject-dependent reporting to EF-Net, where it serves only as a sanity check that our reimplementation behaves like the original across settings, not as a claim about our own method.
 

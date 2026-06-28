@@ -25,8 +25,9 @@ from sklearn.metrics import accuracy_score, f1_score
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-from run_efnet_loso import EFNet, EEGNIRSDataset, log
+from run_efnet_loso import EFNet, EEGNIRSDataset, DeviceResidentBatcher, log
 
+SUBJECTS = ['VP001', 'VP002', 'VP003']  # matches paper's Table 2
 SUBJECTS = ['VP001', 'VP002', 'VP003']  # matches paper's Table 2
 SEEDS = [38, 43, 45]  # matches paper's three random seeds
 
@@ -64,13 +65,13 @@ def run_subject_dependent(all_data, n_epochs=30, batch_size=32, lr=1e-3,
             eeg_norm  = (eeg  - eeg_mean)  / (eeg_std  + 1e-8)
             nirs_norm = (nirs - nirs_mean) / (nirs_std + 1e-8)
 
-            train_loader = DataLoader(
-                EEGNIRSDataset(eeg_norm[train_idx], nirs_norm[train_idx], labels[train_idx]),
-                batch_size=batch_size, shuffle=True
+            train_loader = DeviceResidentBatcher(
+                eeg_norm[train_idx], nirs_norm[train_idx], labels[train_idx],
+                batch_size=batch_size, shuffle=True, device=device
             )
-            test_loader = DataLoader(
-                EEGNIRSDataset(eeg_norm[test_idx], nirs_norm[test_idx], labels[test_idx]),
-                batch_size=batch_size, shuffle=False
+            test_loader = DeviceResidentBatcher(
+                eeg_norm[test_idx], nirs_norm[test_idx], labels[test_idx],
+                batch_size=batch_size, shuffle=False, device=device
             )
 
             model = EFNet(n_classes=2, eeg_shape=eeg.shape[1:], nirs_shape=nirs.shape[1:],
@@ -84,7 +85,6 @@ def run_subject_dependent(all_data, n_epochs=30, batch_size=32, lr=1e-3,
                 model.train()
                 epoch_loss = 0.0
                 for eeg_b, nirs_b, lbl_b in train_loader:
-                    eeg_b, nirs_b, lbl_b = eeg_b.to(device), nirs_b.to(device), lbl_b.to(device)
                     optimizer.zero_grad()
                     loss = criterion(model(eeg_b, nirs_b), lbl_b)
                     loss.backward()
@@ -96,9 +96,8 @@ def run_subject_dependent(all_data, n_epochs=30, batch_size=32, lr=1e-3,
             preds, trues = [], []
             with torch.no_grad():
                 for eeg_b, nirs_b, lbl_b in test_loader:
-                    eeg_b, nirs_b = eeg_b.to(device), nirs_b.to(device)
                     preds.extend(model(eeg_b, nirs_b).argmax(dim=1).cpu().numpy())
-                    trues.extend(lbl_b.numpy())
+                    trues.extend(lbl_b.cpu().numpy())
 
             acc = accuracy_score(trues, preds)
             f1  = f1_score(trues, preds, average='weighted')

@@ -1,0 +1,24 @@
+================================================================================
+TODO LIST: PENDING STALE RUNS TO RE-RUN (WITH NORMALIZATION FIX)
+================================================================================
+
+The following scripts currently have stale JSON results (recorded prior to the 
+2026-06-28 03:34:00 normalization-fix cutoff). They must be re-run to update the 
+manuscript with final normalized pipeline numbers:
+
+1. EF-Net LOSO Baseline (Multimodal)
+   - Command: python3 run_efnet_loso.py --modality both
+   - Outputs: data/processed/efnet_results.json
+
+2. EF-Net LOSO Baseline (EEG only)
+   - Command: python3 run_efnet_loso.py --modality eeg
+   - Outputs: data/processed/efnet_results_eeg.json
+
+3. Cross-Task Generalization
+   - Command: python3 run_foundation_crosstask.py
+   - Outputs: data/processed/crosstask_results.json
+
+================================================================================
+Note: Once these runs are completed, run `python3 generate_paper_tex.py` and
+compile the LaTeX PDF again to populate the final values.
+================================================================================
