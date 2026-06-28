@@ -17,12 +17,13 @@
 
 \title{Foundation Brain: A Task-Agnostic Contrastive Pretraining Backbone for Simultaneous EEG and fNIRS}
 
-\author{Harshit~Agarwal%
-\thanks{Manuscript prepared June 2026.}}
+\author{Anonymous Authors}
 
-\markboth{IEEE Journal of Neural Engineering (Preprint), Vol.~1, June 2026}{Agarwal: Foundation Brain}
+\markboth{INDICON 2026 Submission}{Anonymous Authors: Foundation Brain}
 
 \maketitle
+\thispagestyle{empty}
+\pagestyle{empty}
 
 \begin{abstract}
 Multimodal brain-computer interface research combining electroencephalography (EEG) and functional near-infrared spectroscopy (fNIRS) has so far produced exclusively task-specific classifiers: a new model must be trained from scratch for every cognitive task of interest. We introduce Foundation Brain, a CLIP-style contrastive pretraining framework that learns a single task-agnostic embedding space for simultaneous EEG+fNIRS recordings, evaluated on the Shin et al.\ 2018 simultaneous EEG-NIRS dataset. A symmetric InfoNCE (NT-Xent) objective aligns per-window EEG and fNIRS embeddings from the same trial without using any task labels. We benchmark the frozen backbone via linear probing against EF-Net, a fully-supervised dual-branch CNN baseline, on a word-generation (VF) vs.\ baseline classification task under leave-one-subject-out (LOSO) cross-validation. On 11 subjects, the frozen Foundation Brain linear probe achieves 0.632 accuracy / 0.618 F1, compared to EF-Net's fully end-to-end-trained 0.671 accuracy / 0.660 F1 -- despite never updating the backbone's weights with task labels. We additionally report EF-Net modality ablations (fNIRS-only, EEG-only) against the original paper's Table~4, and a subject-dependent reproduction (Table~2 protocol) on the first three subjects. Critically, we test the backbone's central novelty claim directly: a backbone pretrained \emph{only} on the VF task transfers, via a frozen linear probe, to classifying n-back working-memory load (a three-class task never seen during pretraining), reaching 0.381 accuracy against a 0.333 chance level on 11 subjects. This is preliminary evidence that a single self-supervised EEG+fNIRS backbone can substitute for multiple task-specific models.
@@ -39,27 +40,13 @@ Our contribution is fourfold: (1) a symmetric InfoNCE pretraining objective and 
 \subsection{Dataset}
 We use the Shin et al.\ 2018 \textit{Simultaneous EEG and NIRS during Cognitive Tasks} dataset (\textit{Scientific Data}, Nature; DOI: 10.1038/sdata.2018.3). 26 healthy right-handed subjects were recorded with simultaneous 30-channel EEG (BrainAmp, 1000~Hz, 10-5 system) and 36-channel fNIRS (NIRScout, 10.4~Hz) across three task batteries: (A) n-back working memory (0-, 2-, 3-back difficulty), (B) discrimination/selection response (DSR), and (C) word generation (VF) vs.\ baseline rest. We use Dataset C (VF) as the pretraining and primary evaluation task, and Dataset A (n-back) as the held-out cross-task transfer target, since both are available from the same subjects with simultaneous EEG+fNIRS recordings.
 
-Fig.~\ref{fig:montage} reproduces the original dataset paper's electrode montage and per-task trial timeline (instruction / task / rest durations for all three task batteries), and Figs.~\ref{fig:eeg_erp}-\ref{fig:nirs_hrf} reproduce the dataset paper's own EEG event-related potential and fNIRS hemodynamic-response analyses, included here for reference since they characterize the raw signal properties our preprocessing pipeline (Fig.~\ref{fig:eda}) must preserve.
+Fig.~\ref{fig:montage} reproduces the original dataset paper's electrode montage and per-task trial timeline (instruction / task / rest durations for all three task batteries) for reference, characterizing the raw signal properties our preprocessing pipeline must preserve.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.95\linewidth]{shin2018_fig1_montage_and_tasks.png}
 \caption{Recording montage (panel d: 30 EEG electrodes, yellow; 36 fNIRS optodes, red, 10-5 system) and per-task trial timeline (panels a-c: n-back, DSR, word generation). Reproduced from Shin et al.\ 2018, \textit{Scientific Data} (CC-BY 4.0).}
 \label{fig:montage}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.85\linewidth]{shin2018_fig2_eeg_erp.jpg}
-\caption{EEG event-related potentials, topographic maps, and time-frequency analysis for the n-back task (Dataset A). Reproduced from Shin et al.\ 2018, \textit{Scientific Data} (CC-BY 4.0).}
-\label{fig:eeg_erp}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.85\linewidth]{shin2018_fig3_nirs_hrf.jpg}
-\caption{fNIRS hemodynamic response and topographic maps across 0-/2-/3-back difficulty (Dataset A). Reproduced from Shin et al.\ 2018, \textit{Scientific Data} (CC-BY 4.0).}
-\label{fig:nirs_hrf}
 \end{figure}
 
 \subsection{Existing EEG+fNIRS Architectures}
@@ -69,21 +56,7 @@ EF-Net (used here as our supervised baseline) is a dual-branch CNN: separate con
 \subsection{Preprocessing and Exploratory Signal Analysis}
 Following the original protocol of Shin et al., EEG was bandpass filtered 1--40~Hz (6th-order zero-phase Butterworth) and downsampled to 200~Hz; fNIRS optical density was converted to HbO/HbR concentration via the modified Beer-Lambert law, low-pass filtered at 0.2~Hz, and downsampled to 10~Hz. For each trial we extract 10-second sliding windows (1-second step) yielding paired tensors of shape $(30, 2000)$ for EEG and $(72, 100)$ for fNIRS (36 HbO + 36 HbR channels concatenated). The same 10-second window length is used for both the VF and n-back tasks specifically so that a single backbone architecture, once pretrained, can be applied unmodified to either task's windows for the cross-task transfer experiment.
 
-Fig.~\ref{fig:eda} shows representative raw and preprocessed signals from one subject (VP001): raw EEG before filtering, raw fNIRS HbO/HbR before filtering, the trial-locked hemodynamic response averaged across all 36 fNIRS channels (confirming the expected $\sim$6--10~s post-onset HbO rise), and a fully preprocessed paired EEG+fNIRS window as actually consumed by both models.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.85\linewidth]{VP001_eeg_raw.png}
-\caption{Raw EEG, subject VP001, first 30~s, first 5 channels.}
-\label{fig:eda}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.85\linewidth]{VP001_nirs_raw.png}
-\caption{Raw fNIRS HbO/HbR, subject VP001, first 60~s, first 2 channels.}
-\label{fig:eda_nirs}
-\end{figure}
+Fig.~\ref{fig:eda_hrf} shows the trial-locked hemodynamic response averaged across all 36 fNIRS channels (confirming the expected $\sim$6--10~s post-onset HbO rise), and Fig.~\ref{fig:eda_preproc} shows a fully preprocessed paired EEG+fNIRS window from subject VP001.
 
 \begin{figure}[t]
 \centering
