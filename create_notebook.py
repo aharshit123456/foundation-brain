@@ -172,20 +172,20 @@ for i in range(nirs_n_oxy):
     axes[0].plot(time_trial, oxy.x[start:end, i], lw=0.4, alpha=0.3, color='red')
     axes[1].plot(time_trial, deoxy.x[start:end, i], lw=0.4, alpha=0.3, color='blue')
 
-axes[0].plot(time_trial, oxy.x[start:end, :].mean(axis=1), lw=2, color='darkred', label='mean HbO')
-axes[1].plot(time_trial, deoxy.x[start:end, :].mean(axis=1), lw=2, color='darkblue', label='mean HbR')
+axes[0].plot(time_trial, oxy.x[start:end, :].mean(axis=1), lw=2.5, color='darkred', label='mean HbO')
+axes[1].plot(time_trial, deoxy.x[start:end, :].mean(axis=1), lw=2.5, color='darkblue', label='mean HbR')
 
 for ax in axes:
     ax.axvline(0, color='k', ls='--', lw=1.5, label='Task onset')
-    ax.legend(fontsize=8)
+    ax.legend(fontsize=22)
+    ax.tick_params(labelsize=20)
 
-axes[0].set_ylabel(f'HbO ({oxy.yUnit})')
-axes[1].set_ylabel(f'HbR ({deoxy.yUnit})')
-axes[-1].set_xlabel('Time relative to task onset (s)')
-fig.suptitle(f'{SUBJECT} NIRS — Trial-Locked Response (first VF trial, all 36 channels)', fontsize=12)
+axes[0].set_ylabel(f'HbO ({oxy.yUnit})', fontsize=23)
+axes[1].set_ylabel(f'HbR ({deoxy.yUnit})', fontsize=23)
+axes[-1].set_xlabel('Time relative to task onset (s)', fontsize=23)
 plt.tight_layout()
 out_path = plot_dir / 'VP001_nirs_trial_response.png'
-plt.savefig(str(out_path), dpi=120)
+plt.savefig(str(out_path), dpi=150)
 plt.close()
 print('Saved:', out_path.resolve())
 print(f'First VF trial onset: {first_vf_time_ms} ms ({first_vf_time_ms/1000:.1f} s)')
